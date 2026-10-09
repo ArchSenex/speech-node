@@ -36,12 +36,9 @@ class BreezeEngine:
         repo = Path(cfg["breeze_repo"]).expanduser()
         os.chdir(repo)  # Breeze's code expects to run from its repo
         sys.path.insert(0, str(repo))
-        from dataclasses import replace
-
         from breeze_infer.runtime import load_runtime, resolve_device, set_all_seeds, update_generation_config_for_breeze
         from breeze_infer.templates import get_template, prepare_inputs, select_template_name
         from models.fast_streaming import FastBreezeStreamingRuntime, FastStreamingConfig
-        from models.warmup_profile import load_warmup_profile
 
         self._set_seeds, self._get_template, self._prepare, self._select = set_all_seeds, get_template, prepare_inputs, select_template_name
         self.tokenizer, self.model, self.codec = load_runtime(Path(cfg["model_dir"]).expanduser(), device=resolve_device(), attn_implementation="eager")
@@ -51,9 +48,9 @@ class BreezeEngine:
             self.model, self.codec,
             FastStreamingConfig(max_new_tokens=MAX_NEW_TOKENS, max_seq_len=MAX_SEQ_LEN, repetition_penalty=REPETITION_PENALTY, fast_all=True if fast else None),
             tokenizer=self.tokenizer)
-        if self.runtime.fast_enabled:  # the CUDA graphs, captured once per load from Breeze's own warm-up profile
-            profile = load_warmup_profile(repo / "configs" / "fast.json")
-            self.runtime.warmup_from_profile(replace(profile, codec_chunk_frames=self.runtime.codec_chunk_frames))
+        # The fast path's CUDA graphs are captured as each prompt size first comes up (the first piece of a new size is
+        # slower). Breeze's own warm-up profile isn't used: it declares only short prompts, and a cloning prompt (a
+        # 20-30 s reference and its transcript) is longer than any of them, which the profile then refuses.
         self.sample_rate = self.runtime.sample_rate
         self._n = 0
 
