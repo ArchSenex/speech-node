@@ -35,7 +35,22 @@ Settings for each kind of voice:
 - **Cloning:** `cfg` 1, and `ref_text` must be exactly what the clip says, including any `(sigh)` or `(laugh)`.
 - **Seeds:** in voice design, each seed is a different person. Keep the seed fixed to keep a voice steady.
 
-## Setting up a machine (Windows with WSL, or Linux)
+## One-click install (Windows)
+1. Copy this folder to the computer (or clone it), anywhere.
+2. Double-click **Install Speech Node.cmd**. It does everything:
+   - **WSL and Ubuntu:** if they're missing, it installs them and asks for a reboot. Ubuntu then asks for a username and password, any you like. Run the installer again after that.
+   - **The node:** its Linux packages, its own Python environment, Breeze TTS 2 and its weights (about 7 GB the first time).
+   - **Its settings:** named after the computer, with slots from the card's memory (3 for 32 GB, 2 for 24 GB, 1 otherwise).
+   - **Networking:** WSL's mirrored networking, and a firewall rule for port 7860 (one admin prompt).
+   - **The tray icon:** a Start menu and desktop shortcut, and it starts it.
+   - **The gateway line:** at the end it shows the line to add to the gateway's config.
+3. **From then on:**
+   - **Start it:** the "Speech node" shortcut.
+   - **Stop it:** click the dot by the clock.
+   - **Update it:** copy the new folder over and run the installer again. It keeps your settings.
+   - **Start at log-on:** `Install Speech Node.cmd -AtLogon`.
+
+## Setting up a machine by hand (Windows with WSL, or Linux)
 1. **WSL:** if it isn't installed yet, run `wsl --install -d Ubuntu` in an admin PowerShell and reboot. The NVIDIA driver on Windows is all WSL needs.
 2. In Ubuntu:
    ```
