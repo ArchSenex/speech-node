@@ -1,0 +1,18 @@
+{
+  "name": "this-machine",
+  "host": "0.0.0.0",
+  "port": 7860,
+  "slots": 2,
+  "min_loaded": 1,
+  "slot_mb": 10000,
+  "idle_minutes": 30,
+  "max_queued": 400,
+  "max_chars": 240,
+  "gap_ms": 350,
+  "fast": true,
+  "breeze_repo": "~/speech-node/breeze-tts",
+  "model_dir": "~/speech-node/models/breeze-tts-2",
+  "cache_dir": "~/speech-node/refs",
+  "max_refs": 500,
+  "fake": false
+}
