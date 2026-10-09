@@ -166,7 +166,7 @@ class Pool:
 
     def status(self):
         free, total = free_vram_mb()
-        return {"ok": True, "name": self.cfg["name"], "version": VERSION, "engine": "fake" if self.cfg["fake"] else "breeze-tts-2",
+        return {"ok": True, "name": self.cfg["name"], "version": VERSION, "python": sys.version.split()[0], "engine": "fake" if self.cfg["fake"] else "breeze-tts-2",
                 "slots": self.cfg["slots"], "loaded": len(self.workers), "loading": self.loading, "busy": self.busy(),
                 "queued": self.queue.qsize(), "done": self.done, "sample_rate": self.sample_rate,
                 "vram": {"free_mb": free, "total_mb": total}, "last_error": self.last_error}
