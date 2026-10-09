@@ -10,9 +10,20 @@ TORCH_INDEX="${TORCH_INDEX:-https://download.pytorch.org/whl/cu128}"
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 mkdir -p "$HOME_DIR/models" "$HOME_DIR/refs"
 
-echo "== Python environment ($HOME_DIR/venv)"
-command -v python3 >/dev/null || { echo "python3 is missing: sudo apt install -y python3 python3-venv"; exit 1; }
-[ -x "$HOME_DIR/venv/bin/python" ] || python3 -m venv "$HOME_DIR/venv" || { echo "venv failed: sudo apt install -y python3-venv"; exit 1; }
+# The node's Python is pinned (3.12), whatever the system has: Breeze's fast path uses torch.compile, which newer Pythons
+# (3.14) don't support yet. uv fetches that Python by itself; an environment on another version is moved aside and rebuilt.
+PYVER="${PYTHON_VERSION:-3.12}"
+echo "== Python $PYVER environment ($HOME_DIR/venv)"
+export PATH="$HOME/.local/bin:$PATH"
+if ! command -v uv >/dev/null; then
+  command -v curl >/dev/null || { echo "curl is missing: sudo apt install -y curl"; exit 1; }
+  curl -LsSf https://astral.sh/uv/install.sh | sh -s -- --quiet
+fi
+uv python install -q "$PYVER"
+if [ -x "$HOME_DIR/venv/bin/python" ] && ! "$HOME_DIR/venv/bin/python" -c "import sys; sys.exit(0 if '%d.%d' % sys.version_info[:2] == '$PYVER' else 1)"; then
+  OLD="$HOME_DIR/venv.old-$(date +%Y%m%d-%H%M%S)"; echo "The environment is on another Python; moving it aside to $OLD and rebuilding."; mv "$HOME_DIR/venv" "$OLD"
+fi
+[ -x "$HOME_DIR/venv/bin/python" ] || uv venv -q --seed --python "$PYVER" "$HOME_DIR/venv"
 PIP="$HOME_DIR/venv/bin/pip"
 "$PIP" install -q -U pip wheel setuptools
 

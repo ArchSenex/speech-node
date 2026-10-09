@@ -73,7 +73,9 @@ try {
     Say "6. The tray icon"
     $inst = Join-Path $PSScriptRoot "install-tray.ps1"
     if ($AtLogon) { & $inst -Distro $Distro -AtLogon } else { & $inst -Distro $Distro }
+    # An update: stop the icon and the node already running (it holds the port, and may be the old version)
     Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $_.CommandLine -match 'speech-node-tray\.ps1' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    & wsl.exe -d $Distro -- bash -lc "pkill -f 'speech-node/venv' ; sleep 2 ; pkill -9 -f 'speech-node/venv' ; true" | Out-Null
     Start-Process powershell.exe -ArgumentList "-NoProfile", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", "`"$(Join-Path $PSScriptRoot 'speech-node-tray.ps1')`"", "-Distro", $Distro
     Write-Host "Started: look for the dot by the clock (amber while the voice model loads, green when ready)."
 
