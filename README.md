@@ -47,7 +47,10 @@ Settings for each kind of voice:
    - `name`: the machine's name;
    - `slots`: how many copies it may load at once;
    - `min_loaded`: 0 if the card is often busy with other things.
-4. Run `bash ~/speech-node-app/scripts/run.sh`. From Windows, `scripts/start-node.ps1` opens it in its own window; it can also be a log-on task.
+4. Run it:
+   - **From Windows, the friendly way:** the tray icon. `scripts\speech-node-tray.ps1` starts the node hidden and puts a dot by the clock: green when ready, amber while loading, grey when stopped. Hover over it to see what it's doing. Click it for **Stop speech node (free the graphics card)**, **Start again**, or **Stop and close this icon**. Stopping ends every part of the node, so the card is entirely free for games or anything else.
+   - **Shortcuts:** `scripts\install-tray.ps1` adds "Speech node" to the Start menu and the desktop. Add `-AtLogon` to start it at log-on as well, or `-Remove` to take the shortcuts away. The shortcut paths are as Windows sees the checkout, e.g. `\\wsl.localhost\Ubuntu\home\<you>\speech-node-app\scripts`.
+   - **In a terminal:** `bash ~/speech-node-app/scripts/run.sh`, or `scripts/start-node.ps1` for a console window.
 5. **Reaching it from other machines.** WSL sits behind its own network unless it shares Windows' network. Add this to `%UserProfile%\.wslconfig`, then run `wsl --shutdown`:
    ```
    [wsl2]
