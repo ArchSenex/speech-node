@@ -13,8 +13,8 @@ It serves **Breeze TTS 2**:
   On a 32 GB card that's two or three copies; on 24 GB, one or two.
 - It only loads another copy when work is waiting and the card has `slot_mb` of VRAM free. It lets a copy go after
   `idle_minutes` without work, down to `min_loaded`, so other GPU work (ComfyUI, games) gets the card back.
-- A long text is split into sentence-sized pieces that are spoken in parallel across the loaded copies, then joined
-  with short pauses.
+- A text is spoken as one piece. With `split: true`, a long text is split into sentence-sized pieces that are spoken in
+  parallel across the loaded copies, then joined with short pauses.
 - Requests with a higher `priority` go first.
 
 ## API
@@ -23,7 +23,7 @@ It serves **Breeze TTS 2**:
 | `GET /health` | what it serves, its slots, how many copies are loaded, loading and busy, what's waiting, free VRAM |
 | `PUT /refs/<sha256>` | store a reference clip (the request body), named by its SHA-256 |
 | `GET /refs/<sha256>` | 200 if that clip is stored, 404 if not |
-| `POST /speak` | JSON: `text`, `seed` (default 7), `cfg`, and either `instruction` (design) or `ref_sha` + `ref_text` (cloning); also `priority` (higher first) and `format` (`wav`, the default, or `pcm`) |
+| `POST /speak` | JSON: `text`, `seed` (default 7), `cfg`, and either `instruction` (design) or `ref_sha` + `ref_text` (cloning); also `split` (default false), `priority` (higher first) and `format` (`wav`, the default, or `pcm`) |
 
 What `/speak` returns:
 - **On success:** 16-bit mono WAV (or raw PCM), with the headers `X-Sample-Rate`, `X-Audio-Seconds`, `X-Took-Seconds`, `X-Pieces` and `X-Node`.

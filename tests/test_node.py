@@ -47,9 +47,11 @@ def test_speak_returns_wav_of_the_right_length(client):
     assert r.headers["x-node"] == "test-node"
 
 
-def test_long_text_is_spoken_in_pieces_and_grows_a_second_copy(client):
-    text = " ".join(f"This is sentence number {i}, and it is long enough to matter." for i in range(12))
-    r = client.post("/speak", json={"text": text})
+LONG = " ".join(f"This is sentence number {i}, and it is long enough to matter." for i in range(12))
+
+
+def test_split_long_text_is_spoken_in_pieces_and_grows_a_second_copy(client):
+    r = client.post("/speak", json={"text": LONG, "split": True})
     assert r.status_code == 200 and int(r.headers["x-pieces"]) > 1
     for _ in range(100):
         if client.get("/health").json()["loaded"] == 2:
@@ -75,3 +77,8 @@ def test_pcm_format_and_empty_text(client):
     r = client.post("/speak", json={"text": "Raw please.", "format": "pcm"})
     assert r.status_code == 200 and r.headers["content-type"] == "audio/pcm" and int(r.headers["x-sample-rate"]) > 0
     assert client.post("/speak", json={"text": "  "}).status_code == 400
+
+
+def test_by_default_the_text_is_spoken_as_one_piece(client):
+    r = client.post("/speak", json={"text": LONG})
+    assert r.status_code == 200 and r.headers["x-pieces"] == "1"

@@ -2,7 +2,7 @@
 
 It keeps up to `slots` copies of the model loaded, each in its own process, and runs one piece of speech on each at a
 time. It loads another copy only when work is waiting and the card has room for it, and lets copies go after they've
-sat idle for a while, so the card is free for other work. A long text is split into sentence-sized pieces that are
+sat idle for a while, so the card is free for other work. With "split": true, a long text is split into sentence-sized pieces that are
 spoken in parallel across the loaded copies and joined with short pauses.
 
   GET  /health            what it serves, its slots, what's busy and waiting, free VRAM
@@ -314,7 +314,8 @@ def create_app(cfg):
             job["ref_path"], job["ref_text"] = str(ref), str(b["ref_text"]).strip()
         if b.get("instruction"):
             job["instruction"] = str(b["instruction"]).strip()
-        parts = pieces(text, int(b.get("max_chars") or cfg["max_chars"])) or [text]
+        # The text is spoken as one piece unless "split": true asks for sentence-sized pieces spoken in parallel.
+        parts = (pieces(text, int(b.get("max_chars") or cfg["max_chars"])) or [text]) if b.get("split") is True else [text]
         t = time.time()
         try:
             results = await asyncio.gather(*(pool.submit({**job, "text": p}, int(b.get("priority", 0))) for p in parts))
