@@ -8,6 +8,7 @@ HOME_DIR="${SPEECH_NODE_HOME:-$HOME/speech-node}"
 BREEZE_COMMIT="${BREEZE_COMMIT:-58ec70c}"
 TORCH_INDEX="${TORCH_INDEX:-https://download.pytorch.org/whl/cu128}"
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
+command -v gcc >/dev/null || { echo "A C compiler is missing (the fast path needs one): sudo apt install -y build-essential"; exit 1; }
 mkdir -p "$HOME_DIR/models" "$HOME_DIR/refs"
 
 # The node's Python is pinned (3.12), whatever the system has: Breeze's fast path uses torch.compile, which newer Pythons

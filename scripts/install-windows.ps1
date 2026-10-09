@@ -40,7 +40,8 @@ try {
     Wsl "command -v nvidia-smi >/dev/null && nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || { echo 'No NVIDIA card visible in WSL: update the NVIDIA driver on Windows.'; exit 1; }"
 
     Say "2. Linux packages"
-    Wsl "dpkg -s python3-venv git >/dev/null 2>&1 || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-venv git)" -Root
+    # a C compiler too: Breeze's fast path builds its GPU kernels with one (Triton)
+    Wsl "dpkg -s python3-venv git build-essential curl >/dev/null 2>&1 || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-venv git build-essential curl)" -Root
     Write-Host "Done."
 
     Say "3. The node (Python environment, Breeze TTS 2, its weights: the first time takes a while)"
