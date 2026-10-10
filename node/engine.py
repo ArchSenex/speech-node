@@ -1,6 +1,7 @@
 """The speech engine a worker process runs: Breeze TTS 2 (or a fake one, for tests and for building clients without a GPU).
 
-speak(job) -> (pcm16 bytes, sample_rate). A job: {"text", "seed", "cfg"?, "instruction"?, "ref_path"?, "ref_text"?}.
+speak(job) -> (pcm16 bytes, sample_rate); speak_iter(job) yields pcm16 chunks as they're made (for streaming).
+A job: {"text", "seed", "cfg"?, "instruction"?, "ref_path"?, "ref_text"?}.
 Voice design: an instruction (a description of the voice). Cloning: a reference clip and its exact transcript.
 """
 import math
@@ -23,12 +24,17 @@ class FakeEngine:
     def __init__(self, cfg):
         self.cfg = cfg
 
-    def speak(self, job):
+    def speak_iter(self, job):
         seconds = max(0.4, len(job["text"]) / 15.0)
         t = np.arange(int(seconds * self.sample_rate)) / self.sample_rate
-        tone = 0.1 * np.sin(2 * math.pi * (180 + (job.get("seed", 7) % 40) * 5) * t)
-        time.sleep(seconds * float(self.cfg.get("fake_rtf", 0.02)))  # takes a little time, like a real engine
-        return (tone * 32767).astype("<i2").tobytes(), self.sample_rate
+        pcm = (0.1 * np.sin(2 * math.pi * (180 + (job.get("seed", 7) % 40) * 5) * t) * 32767).astype("<i2").tobytes()
+        step = self.sample_rate // 5 * 2  # 0.2 s of audio at a time, taking a little time each, like a real engine
+        for i in range(0, len(pcm), step):
+            time.sleep(0.2 * float(self.cfg.get("fake_rtf", 0.02)))
+            yield pcm[i:i + step]
+
+    def speak(self, job):
+        return b"".join(self.speak_iter(job)), self.sample_rate
 
 
 class BreezeEngine:
@@ -54,7 +60,7 @@ class BreezeEngine:
         self.sample_rate = self.runtime.sample_rate
         self._n = 0
 
-    def speak(self, job):
+    def speak_iter(self, job):
         self._n += 1
         req = {"id": f"node-{os.getpid()}-{self._n}", "text": job["text"], "speaker": "S0"}
         if job.get("instruction"):
@@ -67,9 +73,11 @@ class BreezeEngine:
         inputs = self._prepare(self.tokenizer, self.codec, self.model, [req], self._get_template(self._select(req)),
                                guidance_scale=cfg, guidance_scale_ref=None, guidance_scale_ins=None)
         self._set_seeds(seed)  # sampling starts from the seed, after all preparation (as Breeze's own server does)
-        parts = [c.audio for c in self.runtime.iter_audio_chunks(inputs, request_id=req["id"], seed=seed)]
-        audio = np.concatenate(parts) if parts else np.zeros(1, dtype="float32")
-        return (np.clip(audio, -1.0, 1.0) * 32767).astype("<i2").tobytes(), self.sample_rate
+        for c in self.runtime.iter_audio_chunks(inputs, request_id=req["id"], seed=seed):
+            yield (np.clip(c.audio, -1.0, 1.0) * 32767).astype("<i2").tobytes()
+
+    def speak(self, job):
+        return b"".join(self.speak_iter(job)) or b"\x00\x00", self.sample_rate
 
 
 def make(cfg):

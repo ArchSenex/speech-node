@@ -82,3 +82,14 @@ def test_pcm_format_and_empty_text(client):
 def test_by_default_the_text_is_spoken_as_one_piece(client):
     r = client.post("/speak", json={"text": LONG})
     assert r.status_code == 200 and r.headers["x-pieces"] == "1"
+
+
+def test_stream_sends_pcm_as_it_is_made(client):
+    with client.stream("POST", "/speak", json={"text": LONG, "stream": True}) as r:
+        assert r.status_code == 200 and r.headers["x-stream"] == "1"
+        rate = int(r.headers["x-sample-rate"])
+        chunks = [c for c in r.iter_bytes() if c]
+    pcm = b"".join(chunks)
+    # (the test client buffers the whole body; real chunking is checked against a live node)
+    assert abs(len(pcm) / 2 / rate - max(0.4, len(LONG) / 15.0)) < 0.3
+    assert client.get("/health").json()["stream"] is True

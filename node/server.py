@@ -30,9 +30,9 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 DEFAULTS = {
     "name": os.uname().nodename if hasattr(os, "uname") else "speech-node",
     "host": "0.0.0.0", "port": 7860,
@@ -123,6 +123,11 @@ def worker_main(cfg, conn):
         jid, job = msg
         t = time.time()
         try:
+            if job.get("stream"):
+                for chunk in engine.speak_iter(job):
+                    conn.send(("chunk", jid, chunk))
+                conn.send(("done", jid, b"", engine.sample_rate, time.time() - t))
+                continue
             pcm, rate = engine.speak(job)
             conn.send(("done", jid, pcm, rate, time.time() - t))
         except Exception as e:
@@ -166,7 +171,7 @@ class Pool:
 
     def status(self):
         free, total = free_vram_mb()
-        return {"ok": True, "name": self.cfg["name"], "version": VERSION, "python": sys.version.split()[0], "engine": "fake" if self.cfg["fake"] else "breeze-tts-2",
+        return {"ok": True, "name": self.cfg["name"], "version": VERSION, "stream": True, "python": sys.version.split()[0], "engine": "fake" if self.cfg["fake"] else "breeze-tts-2",
                 "slots": self.cfg["slots"], "loaded": len(self.workers), "loading": self.loading, "busy": self.busy(),
                 "queued": self.queue.qsize(), "done": self.done, "sample_rate": self.sample_rate,
                 "vram": {"free_mb": free, "total_mb": total}, "last_error": self.last_error}
@@ -216,6 +221,9 @@ class Pool:
             try:
                 w.parent.send((item["id"], item["job"]))
                 msg = await w.recv()
+                while msg[0] == "chunk":  # a streaming job: each chunk goes straight to its request
+                    item["chunks"].put_nowait(msg[2])
+                    msg = await w.recv()
             except Exception as e:
                 msg = ("error", item["id"], f"worker lost: {e}")
                 self.workers.remove(w) if w in self.workers else None
@@ -225,6 +233,8 @@ class Pool:
                 item["future"].set_result((msg[2], msg[3], msg[4]))
             else:
                 item["future"].set_exception(RuntimeError(msg[2]))
+            if item.get("chunks") is not None:
+                item["chunks"].put_nowait(None)  # end of the stream (the future says how it ended)
             if not w.proc.is_alive() and w in self.workers:
                 self.workers.remove(w)
             self.maybe_grow()
@@ -233,6 +243,15 @@ class Pool:
         if self.want_more():
             self.loading += 1  # counted now, so a burst of requests can't start several loads at once
             asyncio.create_task(self.add_worker(counted=True))
+
+    async def submit_stream(self, job, prio):
+        """Queues a streaming job: returns (chunks, future); chunks is an asyncio.Queue of pcm16 bytes, ending with None."""
+        if self.queue.qsize() >= self.cfg["max_queued"]:
+            raise HTTPException(503, "queue full")
+        fut, chunks = asyncio.get_running_loop().create_future(), asyncio.Queue()
+        await self.queue.put((-prio, next(self.order), {"id": next(self.order), "job": {**job, "stream": True}, "future": fut, "chunks": chunks, "prio": -prio}))
+        self.maybe_grow()
+        return chunks, fut
 
     async def submit(self, job, prio):
         if self.queue.qsize() >= self.cfg["max_queued"]:
@@ -314,6 +333,21 @@ def create_app(cfg):
             job["ref_path"], job["ref_text"] = str(ref), str(b["ref_text"]).strip()
         if b.get("instruction"):
             job["instruction"] = str(b["instruction"]).strip()
+        # "stream": true sends 16-bit mono PCM as it's made (one piece; the sample rate is in X-Sample-Rate).
+        if b.get("stream") is True:
+            chunks, fut = await pool.submit_stream({**job, "text": text}, int(b.get("priority", 0)))
+
+            async def body():
+                while True:
+                    c = await chunks.get()
+                    if c is None:
+                        break
+                    yield c
+                try:
+                    await fut
+                except Exception as e:  # the audio stops short; the client sees fewer bytes than it hoped
+                    print(f"[speech-node] stream failed: {e}", flush=True)
+            return StreamingResponse(body(), media_type="audio/pcm", headers={"X-Sample-Rate": str(pool.sample_rate or 24000), "X-Node": cfg["name"], "X-Stream": "1", "Cache-Control": "no-store"})
         # The text is spoken as one piece unless "split": true asks for sentence-sized pieces spoken in parallel.
         parts = (pieces(text, int(b.get("max_chars") or cfg["max_chars"])) or [text]) if b.get("split") is True else [text]
         t = time.time()
