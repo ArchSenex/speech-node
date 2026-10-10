@@ -52,7 +52,10 @@ class BreezeEngine:
         fast = bool(cfg.get("fast", True))
         self.runtime = FastBreezeStreamingRuntime(
             self.model, self.codec,
-            FastStreamingConfig(max_new_tokens=MAX_NEW_TOKENS, max_seq_len=MAX_SEQ_LEN, repetition_penalty=REPETITION_PENALTY, fast_all=True if fast else None),
+            # max_new_tokens caps one generation (1500 is about 95 s of audio); max_seq_len counts the reference prompt too.
+            # Both can be raised in node.json; the model's rope scaling may carry it past 2048, but that's to be listened for.
+            FastStreamingConfig(max_new_tokens=int(cfg.get("max_new_tokens", MAX_NEW_TOKENS)), max_seq_len=int(cfg.get("max_seq_len", MAX_SEQ_LEN)),
+                                repetition_penalty=REPETITION_PENALTY, fast_all=True if fast else None),
             tokenizer=self.tokenizer)
         # The fast path's CUDA graphs are captured as each prompt size first comes up (the first piece of a new size is
         # slower). Breeze's own warm-up profile isn't used: it declares only short prompts, and a cloning prompt (a
